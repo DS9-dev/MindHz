@@ -144,4 +144,5 @@ export interface AppInfo {
   isPackaged: boolean;
   micaSupported: boolean;
   smokeTest: boolean;
+  smokePhase: number;
 }

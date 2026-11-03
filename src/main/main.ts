@@ -26,7 +26,7 @@ import {
 } from 'electron';
 import { DEFAULT_LIBRARY, sanitizeLibrary, sanitizeSettings } from '../shared/schema';
 import type { AppInfo, Library, Settings } from '../shared/types';
-import { parseSmokeArg, resolveDataLocation } from './paths';
+import { parseDataDirArg, parseSmokeArg, resolveDataLocation } from './paths';
 import { JsonStore } from './store';
 
 const smokeDir = parseSmokeArg(process.argv);
@@ -37,7 +37,7 @@ const winBuild = isWin ? Number(release().split('.')[2] ?? 0) : 0;
 const micaSupported = isWin && winBuild >= 22000;
 
 // ── data location (must happen before 'ready') ──────────────────────────────
-const location = resolveDataLocation(process.execPath, app.isPackaged, smokeDir);
+const location = resolveDataLocation(process.execPath, app.isPackaged, smokeDir, parseDataDirArg(process.argv));
 if (location.dir) {
   mkdirSync(location.dir, { recursive: true });
   app.setPath('userData', location.dir);
@@ -306,6 +306,7 @@ function registerIpc(): void {
     isPackaged: app.isPackaged,
     micaSupported,
     smokeTest: !!smokeDir,
+    smokePhase: Number(process.argv.find((a) => a.startsWith('--smoke-phase='))?.split('=')[1] ?? 1),
   }));
 
   handle('store:load', () => ({

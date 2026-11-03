@@ -30,7 +30,13 @@ function writable(dir: string): boolean {
   }
 }
 
-export function resolveDataLocation(execPath: string, isPackaged: boolean, smokeDir: string | null): DataLocation {
+export function resolveDataLocation(
+  execPath: string,
+  isPackaged: boolean,
+  smokeDir: string | null,
+  explicitDir: string | null = null,
+): DataLocation {
+  if (explicitDir) return { dir: explicitDir, portable: false, portableFallback: false };
   if (smokeDir) return { dir: join(smokeDir, 'userdata'), portable: false, portableFallback: false };
   const exeDir = process.env.PORTABLE_EXECUTABLE_DIR || dirname(execPath);
   const marker = join(exeDir, 'portable.txt');
@@ -45,6 +51,12 @@ export function resolveDataLocation(execPath: string, isPackaged: boolean, smoke
 export function parseSmokeArg(argv: string[]): string | null {
   const a = argv.find((x) => x.startsWith('--smoke-test'));
   if (!a) return null;
-  const [, v] = a.split('=');
+  const v = a.includes('=') ? a.slice(a.indexOf('=') + 1) : '';
   return v || join(process.cwd(), 'smoke-output');
+}
+
+/** --data-dir=<path>: use an explicit data folder (development, testing, multiple profiles). */
+export function parseDataDirArg(argv: string[]): string | null {
+  const a = argv.find((x) => x.startsWith('--data-dir='));
+  return a ? a.slice('--data-dir='.length) || null : null;
 }
