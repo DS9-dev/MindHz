@@ -1,0 +1,125 @@
+name: Release
+
+# Push a tag like v0.1.0 (matching package.json "version") to build, test and publish
+# MindHz for Windows x64. Nothing else is needed — see docs/RELEASING.md.
+on:
+  push:
+    tags: ['v*.*.*']
+
+permissions:
+  contents: write # create the GitHub Release (uses the built-in GITHUB_TOKEN only)
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  windows:
+    name: Build, verify and publish (Windows x64)
+    runs-on: windows-latest
+    timeout-minutes: 60
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false' # unsigned build; never pick up random certificates
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Check tag matches package.json version
+        shell: bash
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          if [ "v$VERSION" != "${GITHUB_REF_NAME}" ]; then
+            echo "::error::Tag ${GITHUB_REF_NAME} does not match package.json version $VERSION"
+            exit 1
+          fi
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+
+      - name: Install dependencies (locked)
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Build installer and unpacked app
+        run: |
+          npm run build
+          npx electron-builder --win nsis --x64 --publish never
+
+      - name: Build portable ZIP
+        run: node scripts/make-portable.mjs
+
+      - name: Smoke test — unpacked build
+        run: npm run smoke -- --exe "release/win-unpacked/MindHz.exe" --out "${{ runner.temp }}/smoke-unpacked"
+
+      - name: Smoke test — portable ZIP (fresh extraction)
+        shell: pwsh
+        run: |
+          $dest = Join-Path $env:RUNNER_TEMP 'portable'
+          Expand-Archive -Path "release/MindHz-Portable-$env:VERSION.zip" -DestinationPath $dest -Force
+          $exe = Join-Path $dest "MindHz-$env:VERSION/MindHz.exe"
+          npm run smoke -- --exe "$exe" --out (Join-Path $env:RUNNER_TEMP 'smoke-portable') --keep-data
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          $settings = Join-Path $dest "MindHz-$env:VERSION/MindHz-Data/settings.json"
+          if (-not (Test-Path $settings)) { Write-Error "portable data was not stored next to the exe"; exit 1 }
+          Write-Host "portable data folder OK: $settings"
+
+      - name: Smoke test — installer (silent install, run, uninstall)
+        shell: pwsh
+        run: |
+          $dir = Join-Path $env:RUNNER_TEMP 'MindHzInstall'
+          $setup = "release/MindHz-Setup-$env:VERSION.exe"
+          Start-Process -FilePath $setup -ArgumentList '/S', "/D=$dir" -Wait
+          $exe = Join-Path $dir 'MindHz.exe'
+          if (-not (Test-Path $exe)) { Write-Error 'installer did not install MindHz.exe'; exit 1 }
+          npm run smoke -- --exe "$exe" --out (Join-Path $env:RUNNER_TEMP 'smoke-installed')
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          $uninstaller = Join-Path $dir 'Uninstall MindHz.exe'
+          Start-Process -FilePath $uninstaller -ArgumentList '/S' -Wait
+          Start-Sleep -Seconds 8
+          if (Test-Path $exe) { Write-Error 'uninstaller left MindHz.exe behind'; exit 1 }
+          Write-Host 'install / run / uninstall OK'
+
+      - name: SHA-256 checksums
+        run: node scripts/checksums.mjs release
+
+      - name: Release notes
+        shell: bash
+        run: |
+          node -e "
+            const fs=require('fs');const v=process.env.VERSION;
+            const log=fs.readFileSync('CHANGELOG.md','utf8');
+            const m=log.split(/^## /m).find(s=>s.startsWith('['+v+']')||s.startsWith(v));
+            const body=(m?m.split('\n').slice(1).join('\n').trim():'');
+            const sums=fs.readFileSync('release/SHA256SUMS.txt','utf8');
+            const notes=[body,'',fs.readFileSync('docs/release-notes-footer.md','utf8'),'','### SHA-256','\`\`\`',sums.trim(),'\`\`\`'].join('\n');
+            fs.writeFileSync('release-notes.md',notes);"
+
+      - name: Publish GitHub Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PRE=""
+          if [[ "$VERSION" == *-* ]]; then PRE="--prerelease"; fi
+          gh release create "$GITHUB_REF_NAME" \
+            "release/MindHz-Setup-$VERSION.exe" \
+            "release/MindHz-Portable-$VERSION.zip" \
+            "release/SHA256SUMS.txt" \
+            --title "MindHz $VERSION" \
+            --notes-file release-notes.md \
+            $PRE
+
+      - name: Upload smoke reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-reports
+          path: ${{ runner.temp }}/smoke-*/**/*.json
+          if-no-files-found: ignore

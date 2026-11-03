@@ -1,0 +1,49 @@
+# electron-builder configuration — see docs/RELEASING.md
+appId: io.github.ds9dev.mindhz
+productName: MindHz
+copyright: Copyright © 2026 DS9-dev
+directories:
+  output: release
+  buildResources: build
+files:
+  - dist/**/*
+  - '!dist/**/*.map'
+  - build/icon.png
+  - package.json
+asar: true
+compression: normal
+electronLanguages:
+  - ru
+  - en-US
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  icon: build/icon.ico
+  executableName: MindHz
+  requestedExecutionLevel: asInvoker
+nsis:
+  oneClick: false
+  perMachine: false
+  allowElevation: true
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: always
+  createStartMenuShortcut: true
+  shortcutName: MindHz
+  uninstallDisplayName: MindHz ${version}
+  # user data (%APPDATA%\MindHz) is kept on update and uninstall
+  deleteAppDataOnUninstall: false
+  installerIcon: build/icon.ico
+  uninstallerIcon: build/icon.ico
+  installerLanguages: [ru_RU, en_US]
+  language: '1049'
+  artifactName: MindHz-Setup-${version}.${ext}
+linux:
+  target: [dir]
+  icon: build/icon.png
+  category: Audio
+mac:
+  category: public.app-category.music
+  icon: build/icon.png
+  target: [dmg]
+publish: null

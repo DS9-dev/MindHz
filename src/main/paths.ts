@@ -6,7 +6,9 @@
  *                    `portable.txt` shipped in the portable ZIP). If that folder is not
  *                    writable (e.g. unpacked into Program Files), MindHz falls back to
  *                    %APPDATA%\MindHz and tells the user.
- *  Smoke test:       <smoke dir>/userdata (isolated)
+ *  Smoke test:       <smoke dir>/userdata (isolated), except for the portable build,
+ *                    where the portable policy is exercised as-is.
+ *  --data-dir=<dir>: explicit folder (development / testing).
  */
 import { accessSync, constants, existsSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -37,14 +39,15 @@ export function resolveDataLocation(
   explicitDir: string | null = null,
 ): DataLocation {
   if (explicitDir) return { dir: explicitDir, portable: false, portableFallback: false };
-  if (smokeDir) return { dir: join(smokeDir, 'userdata'), portable: false, portableFallback: false };
   const exeDir = process.env.PORTABLE_EXECUTABLE_DIR || dirname(execPath);
   const marker = join(exeDir, 'portable.txt');
+  // the portable policy also applies in smoke mode, so CI verifies it for real
   if (isPackaged && existsSync(marker)) {
     const dir = join(exeDir, 'MindHz-Data');
     if (writable(dir)) return { dir, portable: true, portableFallback: false };
     return { dir: null, portable: true, portableFallback: true };
   }
+  if (smokeDir) return { dir: join(smokeDir, 'userdata'), portable: false, portableFallback: false };
   return { dir: null, portable: false, portableFallback: false };
 }
 
