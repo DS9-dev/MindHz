@@ -1,0 +1,49 @@
+{
+  "name": "mindhz",
+  "productName": "MindHz",
+  "version": "0.1.0",
+  "description": "MindHz — свободная студия звуковых частот: бинауральные и монауральные биения, изохронные импульсы, шумы, конструктор сеансов и экспорт WAV/FLAC. Честно о науке.",
+  "author": {
+    "name": "DS9-dev",
+    "url": "https://github.com/DS9-dev"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/DS9-dev/MindHz",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/DS9-dev/MindHz.git"
+  },
+  "bugs": {
+    "url": "https://github.com/DS9-dev/MindHz/issues"
+  },
+  "main": "dist/main/main.js",
+  "private": true,
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "watch": "node scripts/build.mjs --watch",
+    "start": "electron .",
+    "dev": "node scripts/dev.mjs",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "node --import tsx --test \"tests/**/*.test.ts\"",
+    "smoke": "node --import tsx scripts/smoke.ts",
+    "pack:win": "npm run build && electron-builder --win dir --x64 --publish never",
+    "dist:win": "npm run build && electron-builder --win nsis --x64 --publish never && node scripts/make-portable.mjs",
+    "dist:linux": "npm run build && electron-builder --linux dir --publish never",
+    "checksums": "node scripts/checksums.mjs release"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "electron": "43.4.0",
+    "electron-builder": "^26.0.12",
+    "esbuild": "^0.25.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "tsx": "^4.20.3",
+    "typescript": "~5.9.2"
+  }
+}
