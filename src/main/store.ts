@@ -19,7 +19,7 @@ export class JsonStore<T> {
 
   constructor(
     private readonly dir: string,
-    private readonly name: string,
+    name: string,
     private readonly sanitize: (v: unknown) => T,
   ) {
     this.path = join(dir, name);

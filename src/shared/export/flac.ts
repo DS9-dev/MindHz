@@ -160,7 +160,6 @@ export class FlacEncoder implements AudioEncoder {
   private readonly res: Int32Array;
   private readonly side: Int32Array;
   private readonly mid: Int32Array;
-  private headerLen = 0;
 
   constructor(o: FlacOptions) {
     this.o = { blockSize: 4096, vendor: 'MindHz FLAC encoder', ...o };
@@ -210,7 +209,6 @@ export class FlacEncoder implements AudioEncoder {
     le32(comment.length);
     for (const b of comment) w.write(b, 8);
     const out = w.bytes().slice();
-    this.headerLen = out.length;
     this.bytesWritten = out.length;
     return out;
   }
