@@ -1,10 +1,14 @@
 name: Release
 
-# Push a tag like v0.1.0 (matching package.json "version") to build, test and publish
-# MindHz for Windows x64. Nothing else is needed — see docs/RELEASING.md.
+# Publishes MindHz for Windows x64. Two equivalent triggers (see docs/RELEASING.md):
+#  - bump "version" in package.json and push to main → released if v<version> does not exist yet;
+#  - or push a tag v<version> that matches package.json.
 on:
   push:
+    branches: [main]
+    paths: [package.json]
     tags: ['v*.*.*']
+  workflow_dispatch:
 
 permissions:
   contents: write # create the GitHub Release (uses the built-in GITHUB_TOKEN only)
@@ -14,8 +18,35 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  check:
+    name: Decide whether to release
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+      publish: ${{ steps.v.outputs.publish }}
+    steps:
+      - uses: actions/checkout@v5
+      - id: v
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          if [[ "$GITHUB_REF" == refs/tags/* && "$GITHUB_REF_NAME" != "v$VERSION" ]]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match package.json version $VERSION"; exit 1
+          fi
+          if gh release view "v$VERSION" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release v$VERSION already exists — nothing to do."
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          fi
+
   windows:
     name: Build, verify and publish (Windows x64)
+    needs: check
+    if: needs.check.outputs.publish == 'true'
     runs-on: windows-latest
     timeout-minutes: 60
     env:
@@ -28,15 +59,9 @@ jobs:
           node-version: 22
           cache: npm
 
-      - name: Check tag matches package.json version
+      - name: Version
         shell: bash
-        run: |
-          VERSION=$(node -p "require('./package.json').version")
-          if [ "v$VERSION" != "${GITHUB_REF_NAME}" ]; then
-            echo "::error::Tag ${GITHUB_REF_NAME} does not match package.json version $VERSION"
-            exit 1
-          fi
-          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+        run: echo "VERSION=${{ needs.check.outputs.version }}" >> "$GITHUB_ENV"
 
       - name: Install dependencies (locked)
         run: npm ci
@@ -108,7 +133,8 @@ jobs:
         run: |
           PRE=""
           if [[ "$VERSION" == *-* ]]; then PRE="--prerelease"; fi
-          gh release create "$GITHUB_REF_NAME" \
+          # creates the tag v$VERSION on this commit if it does not exist yet
+          gh release create "v$VERSION" --target "$GITHUB_SHA" \
             "release/MindHz-Setup-$VERSION.exe" \
             "release/MindHz-Portable-$VERSION.zip" \
             "release/SHA256SUMS.txt" \

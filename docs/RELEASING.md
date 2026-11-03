@@ -2,20 +2,20 @@
 
 1. Update `version` in `package.json` (semantic versioning, e.g. `0.2.0`; a suffix such as `0.2.0-beta.1` publishes a pre-release).
 2. Add a `## [0.2.0] — YYYY-MM-DD` section to `CHANGELOG.md`.
-3. Commit, then tag and push:
+3. Commit and push to `main`:
    ```bash
-   git tag v0.2.0
-   git push origin main v0.2.0
+   git commit -am "Release 0.2.0" && git push
    ```
+   (Pushing a tag `v0.2.0` works too.)
 
-The **Release** workflow (`.github/workflows/release.yml`) then runs on a clean `windows-latest` machine:
+The **Release** workflow (`.github/workflows/release.yml`) then checks whether release `v0.2.0` already exists; if not, it runs on a clean `windows-latest` machine:
 
-1. checks that the tag equals the `package.json` version;
+1. checks that a pushed tag (if any) equals the `package.json` version;
 2. `npm ci` (locked dependencies), typecheck, unit tests;
 3. builds `MindHz-Setup-<v>.exe` (NSIS) and `MindHz-Portable-<v>.zip`;
 4. smoke-tests the unpacked app, a fresh extraction of the portable ZIP (incl. data stored in `MindHz-Data`), and the installer (silent install → run → silent uninstall);
 5. writes `SHA256SUMS.txt`;
-6. publishes a GitHub Release with the two files, checksums and notes from `CHANGELOG.md`.
+6. creates the tag and publishes a GitHub Release with the two files, checksums and notes from `CHANGELOG.md`.
 
 Only the built-in, short-lived `GITHUB_TOKEN` is used; no secrets are stored in the repository.
 
